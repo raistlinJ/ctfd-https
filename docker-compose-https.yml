@@ -1,0 +1,127 @@
+version: "3.8"
+
+services:
+  # -------------------------------------------------
+  # Generate self-signed TLS certs (one-time)
+  # -------------------------------------------------
+  cert-init:
+    image: alpine:3.20
+    container_name: ctfd-cert-init
+    volumes:
+      - ./certs:/certs
+    entrypoint: >
+      sh -c '
+      if [ ! -f /certs/fullchain.pem ] || [ ! -f /certs/privkey.pem ]; then
+        echo "Generating self-signed TLS certs...";
+        apk add --no-cache openssl &&
+        openssl req -x509 -nodes -days 3650 \
+          -newkey rsa:4096 \
+          -keyout /certs/privkey.pem \
+          -out /certs/fullchain.pem \
+          -subj "/C=US/ST=CTF/L=CTF/O=CTFd/OU=Dev/CN=localhost";
+      else
+        echo "TLS certs already exist. Skipping.";
+      fi
+      '
+    restart: "no"
+
+  # -------------------------------------------------
+  # Generate CTFd SECRET_KEY env file (one-time)
+  # -------------------------------------------------
+  secret-init:
+    image: alpine:3.20
+    container_name: ctfd-secret-init
+    volumes:
+      - ./secrets:/secrets
+    entrypoint: >
+      sh -c '
+      if [ ! -f /secrets/.env ]; then
+        echo "Generating CTFd SECRET_KEY env file...";
+        apk add --no-cache openssl &&
+        echo "SECRET_KEY=$(openssl rand -hex 32)" > /secrets/.env;
+      else
+        echo "CTFd SECRET_KEY env file already exists. Skipping.";
+      fi
+      '
+    restart: "no"
+
+  # -------------------------------------------------
+  # Nginx HTTPS Reverse Proxy
+  # -------------------------------------------------
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: ctfd-nginx
+    restart: unless-stopped
+    depends_on:
+      - cert-init
+      - ctfd
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./certs:/etc/nginx/certs:ro
+    networks:
+      - ctfd-net
+
+  # -------------------------------------------------
+  # CTFd Application with wait-for-DB
+  # -------------------------------------------------
+  ctfd:
+    image: ctfd/ctfd:latest
+    container_name: ctfd
+    restart: unless-stopped
+    depends_on:
+      - secret-init
+      - db
+      - cache
+    env_file:
+      - ./secrets/.env
+    environment:
+      DATABASE_URL: mysql+pymysql://ctfd:ctfd@db/ctfd
+      REDIS_URL: redis://cache:6379
+      WORKERS: 4
+      REVERSE_PROXY: "true"
+    volumes:
+      - ./ctfd/logs:/var/log/ctfd
+      - ./ctfd/uploads:/var/uploads
+      - ./ctfd-entrypoint.sh:/run/ctfd-entrypoint.sh:ro
+    expose:
+      - "8000"
+    command: sh -c "sh /run/ctfd-entrypoint.sh"
+    networks:
+      - ctfd-net
+
+  # -------------------------------------------------
+  # MariaDB
+  # -------------------------------------------------
+  db:
+    image: mariadb:10.11
+    container_name: ctfd-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: ctfd
+      MYSQL_USER: ctfd
+      MYSQL_PASSWORD: ctfd
+      MYSQL_WAIT_TIMEOUT: 28800
+      MYSQL_MAX_ALLOWED_PACKET: 64M
+    volumes:
+      - ./db:/var/lib/mysql
+    networks:
+      - ctfd-net
+
+  # -------------------------------------------------
+  # Redis
+  # -------------------------------------------------
+  cache:
+    image: redis:7-alpine
+    container_name: ctfd-redis
+    restart: unless-stopped
+    networks:
+      - ctfd-net
+
+networks:
+  ctfd-net:
+    driver: bridge
