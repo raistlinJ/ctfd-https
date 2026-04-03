@@ -90,6 +90,8 @@ services:
     volumes:
       - ./ctfd/logs:/var/log/ctfd
       - ./ctfd/uploads:/var/uploads
+      # Mount custom themes below. Replace "custom-theme" with the actual name of your theme (like "mariokart").
+      - ./ctfd/themes/custom-theme:/opt/CTFd/CTFd/themes/custom-theme
     expose:
       - "8000"
     networks:
