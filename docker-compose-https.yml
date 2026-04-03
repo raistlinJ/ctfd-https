@@ -58,6 +58,9 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    security_opt:
+      - apparmor:unconfined
+      - seccomp:unconfined
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
@@ -87,10 +90,8 @@ services:
     volumes:
       - ./ctfd/logs:/var/log/ctfd
       - ./ctfd/uploads:/var/uploads
-      - ./ctfd-entrypoint.sh:/run/ctfd-entrypoint.sh:ro
     expose:
       - "8000"
-    entrypoint: ["/bin/sh", "/run/ctfd-entrypoint.sh"]
     networks:
       - ctfd-net
 
@@ -101,6 +102,9 @@ services:
     image: mariadb:10.11
     container_name: ctfd-db
     restart: unless-stopped
+    security_opt:
+      - apparmor:unconfined
+      - seccomp:unconfined
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: ctfd
