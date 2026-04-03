@@ -10,4 +10,4 @@ if [ -z "$SECRET_KEY" ]; then
 fi
 
 echo "MariaDB is up, starting CTFd..."
-exec /entrypoint.sh
+exec /opt/CTFd/docker-entrypoint.sh
