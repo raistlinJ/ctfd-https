@@ -1,0 +1,4 @@
+# CTFd backups contain credentials and participant data.
+/*.zip
+/*.zip.log
+__pycache__/
