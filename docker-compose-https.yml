@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   # -------------------------------------------------
   # Generate self-signed TLS certs (one-time)
@@ -49,7 +47,8 @@ services:
   # CTFd Application with wait-for-DB
   # -------------------------------------------------
   ctfd:
-    image: ctfd/ctfd:latest
+    # Match the release used to convert and verify exported backups.
+    image: ctfd/ctfd:3.8.7
     container_name: ctfd
     restart: unless-stopped
     depends_on:

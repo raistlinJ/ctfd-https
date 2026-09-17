@@ -17,6 +17,20 @@ Compose reads `env_file` before starting any containers, so a Compose init
 service cannot create a required env file on the first run. The key is supplied
 only through `env_file`: an explicit `environment.SECRET_KEY` would override it.
 
+The deployment is pinned to CTFd 3.8.7, matching the converted backups. After
+copying the updated Compose file to an existing server, upgrade its app with:
+
+```sh
+docker compose -f docker-compose-https.yml pull ctfd
+docker compose -f docker-compose-https.yml up -d --no-deps ctfd
+docker compose -f docker-compose-https.yml exec ctfd python -c 'from CTFd import __version__; print(__version__)'
+```
+
+Confirm that the last command prints `3.8.7`, then retry the Web UI import.
+An older image (including a locally cached `latest` tag) may reject these ZIPs
+with “The target migration in this backup is not available in this version of
+CTFd.” Restarting an existing container alone does not upgrade its image.
+
 ## CTFd export conversion
 
 Convert an older CTFd export to a current export with Python 3.9+ and Docker:
