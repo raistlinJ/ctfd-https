@@ -2,3 +2,4 @@
 /*.zip
 /*.zip.log
 __pycache__/
+/secrets/

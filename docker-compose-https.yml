@@ -26,26 +26,6 @@ services:
     restart: "no"
 
   # -------------------------------------------------
-  # Generate CTFd SECRET_KEY env file (one-time)
-  # -------------------------------------------------
-  secret-init:
-    image: alpine:3.20
-    container_name: ctfd-secret-init
-    volumes:
-      - ./secrets:/secrets
-    entrypoint: >
-      sh -c '
-      if [ ! -f /secrets/.env ]; then
-        echo "Generating CTFd SECRET_KEY env file...";
-        apk add --no-cache openssl &&
-        echo "SECRET_KEY=$(openssl rand -hex 32)" > /secrets/.env;
-      else
-        echo "CTFd SECRET_KEY env file already exists. Skipping.";
-      fi
-      '
-    restart: "no"
-
-  # -------------------------------------------------
   # Nginx HTTPS Reverse Proxy
   # -------------------------------------------------
   nginx:
@@ -73,9 +53,9 @@ services:
     container_name: ctfd
     restart: unless-stopped
     depends_on:
-      - secret-init
       - db
       - cache
+    # Created on the host by start.sh before Compose reads this file.
     env_file:
       - ./secrets/.env
     environment:
@@ -83,7 +63,6 @@ services:
       REDIS_URL: redis://cache:6379
       WORKERS: 4
       REVERSE_PROXY: "true"
-      SECRET_KEY: ${SECRET_KEY:-default_secret_key_change_me}
     volumes:
       - ./ctfd/logs:/var/log/ctfd
       - ./ctfd/uploads:/var/uploads

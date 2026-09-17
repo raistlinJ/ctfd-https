@@ -1,4 +1,23 @@
-# CTFd export conversion
+# CTFd HTTPS and export conversion
+
+## Starting the HTTPS deployment
+
+With Docker Compose and OpenSSL installed, run:
+
+```sh
+sh start.sh
+```
+
+This creates `secrets/.env` with a random CTFd `SECRET_KEY` before starting
+Compose. Subsequent starts reuse the existing key. Keep this file with your
+deployment; it is excluded from Git. Extra arguments are passed to `compose up`,
+for example `sh start.sh --build`.
+
+Compose reads `env_file` before starting any containers, so a Compose init
+service cannot create a required env file on the first run. The key is supplied
+only through `env_file`: an explicit `environment.SECRET_KEY` would override it.
+
+## CTFd export conversion
 
 Convert an older CTFd export to a current export with Python 3.9+ and Docker:
 
