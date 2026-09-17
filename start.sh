@@ -20,4 +20,5 @@ if ! grep -Eq '^SECRET_KEY=.+$' secrets/.env; then
     exit 1
 fi
 
+echo "Starting Compose; CTFd's pull_policy checks the latest image in the registry."
 exec docker compose -f docker-compose-https.yml up -d "$@"

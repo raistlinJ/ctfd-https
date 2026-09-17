@@ -47,8 +47,9 @@ services:
   # CTFd Application with wait-for-DB
   # -------------------------------------------------
   ctfd:
-    # Match the release used to convert and verify exported backups.
-    image: ctfd/ctfd:3.8.7
+    # Check the registry on each Compose start, even if latest is cached locally.
+    image: ctfd/ctfd:latest
+    pull_policy: always
     container_name: ctfd
     restart: unless-stopped
     depends_on:

@@ -17,19 +17,24 @@ Compose reads `env_file` before starting any containers, so a Compose init
 service cannot create a required env file on the first run. The key is supplied
 only through `env_file`: an explicit `environment.SECRET_KEY` would override it.
 
-The deployment is pinned to CTFd 3.8.7, matching the converted backups. After
-copying the updated Compose file to an existing server, upgrade its app with:
+The deployment uses `ctfd/ctfd:latest` with `pull_policy: always`. Every Compose
+`up` (including `sh start.sh`) checks the registry and recreates CTFd if its image
+has changed. A failed pull stops startup instead of silently using an old image.
+The latest image was checked locally on 2026-09-17 and contains CTFd 3.8.7.
+After copying the updated Compose file to an existing server, force an upgrade
+of the app and verify the version actually running:
 
 ```sh
-docker compose -f docker-compose-https.yml pull ctfd
-docker compose -f docker-compose-https.yml up -d --no-deps ctfd
+docker compose -f docker-compose-https.yml up -d --no-deps --pull always --force-recreate ctfd
 docker compose -f docker-compose-https.yml exec ctfd python -c 'from CTFd import __version__; print(__version__)'
 ```
 
-Confirm that the last command prints `3.8.7`, then retry the Web UI import.
+Confirm that the last command prints `3.8.7` (or a newer release), then retry the Web UI import.
 An older image (including a locally cached `latest` tag) may reject these ZIPs
 with “The target migration in this backup is not available in this version of
 CTFd.” Restarting an existing container alone does not upgrade its image.
+The saved import error can remain visible after an upgrade until another import
+is attempted; use the running version to verify that the upgrade took effect.
 
 ## CTFd export conversion
 
