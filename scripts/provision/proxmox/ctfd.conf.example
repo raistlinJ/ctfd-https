@@ -1,0 +1,33 @@
+# CTFd Proxmox installer configuration
+#
+# One lowercase key=value per line. Blank lines and full-line comments are
+# ignored. Values may be unquoted or enclosed in matching single/double quotes.
+# Parsed as data, never sourced: no shell, variable, or ~ expansion.
+# Relative paths are relative to the directory where you run the installer.
+# Precedence: defaults < this file < CTFD_* environment < CLI flags.
+# Each key has an uppercase environment equivalent, e.g. CTFD_VMID.
+
+# VM: minimal Debian 12, fixed 40 GiB disk and 4096 MiB RAM
+vmid=9501
+name=ctfd
+cores=2
+storage=local-lvm
+snippet_storage=local
+bridge=vmbr0
+
+# Use dhcp, or an IPv4 CIDR with its gateway (e.g. 192.168.1.50/24).
+ip=dhcp
+gateway=
+dns=
+
+# Required public key file on the Proxmox node; guest login user is ctfd.
+ssh_public_key=/root/ctfd-admin.pub
+
+# Published branch or tag of a public HTTPS repository
+repo_url=https://github.com/raistlinJ/ctfd-https.git
+repo_ref=main
+
+# Boolean values: true/false, yes/no, on/off, or 1/0 (case-insensitive)
+wait_minutes=30
+no_wait=false
+dry_run=false

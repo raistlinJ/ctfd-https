@@ -1,5 +1,23 @@
 # CTFd HTTPS and export conversion
 
+## Provisioning on Proxmox
+
+The [Proxmox installer](scripts/provision/proxmox/README.md) creates a minimal
+Debian 12 VM with a **40 GiB disk, 4 GiB RAM, and 2 vCPUs**, installs Docker, and
+starts this HTTPS deployment. Run it as root on the Proxmox node:
+
+```sh
+bash scripts/provision/proxmox/install-ctfd.sh --ssh-public-key /root/ctfd-admin.pub
+```
+
+Defaults: VM ID `9501`, disk storage `local-lvm`, snippet storage `local`,
+bridge `vmbr0`, and DHCP. Use `--help` for static networking and other options,
+or `--dry-run` to preview. The guest clones the published `main` branch.
+For repeatable settings, copy
+[`ctfd.conf.example`](scripts/provision/proxmox/ctfd.conf.example) and pass
+`--config /root/ctfd.conf`. Precedence is defaults, config, `CTFD_*` environment,
+then command-line flags.
+
 ## Starting the HTTPS deployment
 
 With Docker Compose and OpenSSL installed, run:
