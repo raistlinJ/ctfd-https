@@ -54,6 +54,28 @@ CTFd.” Restarting an existing container alone does not upgrade its image.
 The saved import error can remain visible after an upgrade until another import
 is attempted; use the running version to verify that the upgrade took effect.
 
+## Updating the HTTPS proxy
+
+The proxy image is pinned to Nginx 1.30.5, which includes the fix for
+[CVE-2026-42533](https://nginx.org/en/security_advisories.html) (fixed in stable
+1.30.4 and later). Keep this pin current when applying future security updates.
+
+On an existing deployment, pull the updated repository and recreate only the
+proxy with the pinned image. This briefly interrupts HTTP and HTTPS access:
+
+```sh
+git pull
+docker compose -f docker-compose-https.yml pull nginx
+docker compose -f docker-compose-https.yml up -d --no-deps --force-recreate nginx
+docker compose -f docker-compose-https.yml exec nginx nginx -t
+docker compose -f docker-compose-https.yml exec nginx nginx -v
+```
+
+Verify that the running proxy reports `nginx/1.30.5`, then rerun the vulnerability
+scan against the same host and port. Restarting or reloading the old container
+alone does not update its image; updating this repository alone does not patch
+a running deployment.
+
 ## CTFd export conversion
 
 Convert an older CTFd export to a current export with Python 3.9+ and Docker:
