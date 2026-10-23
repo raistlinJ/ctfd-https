@@ -35,7 +35,37 @@ Compose reads `env_file` before starting any containers, so a Compose init
 service cannot create a required env file on the first run. The key is supplied
 only through `env_file`: an explicit `environment.SECRET_KEY` would override it.
 
-The deployment uses `ctfd/ctfd:latest` with `pull_policy: always`. Every Compose
+### Starting a CTFd fork by URL
+
+To run the version with **Retract solve** for users and teams:
+
+```sh
+sh start.sh --source-url 'https://github.com/raistlinJ/CTFd.git#feature/retract-solves'
+```
+
+This builds the selected Git repository's Dockerfile and starts it in the same
+HTTPS stack. Append `#branch`, `#tag`, or a full 40-character commit hash to select
+a version. For this exact tested revision, use
+`https://github.com/raistlinJ/CTFd.git#1c19ae182ebe2648f57a0c072937db1bd1b4594a`.
+The URL can also be supplied through `CTFD_SOURCE_URL`. Put `--source-url` before
+any Compose arguments, for example `--source-url 'URL#ref' --force-recreate ctfd`.
+
+Source mode uses `docker-compose-source.yml`, builds on every invocation, and
+uses the selected source's bundled themes and compiled frontend. It keeps the
+existing database, uploads, logs, certificates, and secret key. The host's
+`ctfd/themes` directory is left in place but is not mounted in this mode, so it
+cannot hide the fork's new UI. Docker Compose **2.24.4 or newer** is required.
+The initial build can take several minutes.
+
+Supply the URL again on each manual start (or set `CTFD_SOURCE_URL` in your
+shell). Automatic container restarts keep the selected image. To switch back
+to the official image, unset `CTFD_SOURCE_URL` and run `sh start.sh`.
+
+The Proxmox installer accepts the same `--source-url` option, or `source_url` in
+its config file. This selects the CTFd application; `--repo-url` and `--repo-ref`
+continue to select the separate HTTPS deployment repository.
+
+Without a source URL, the deployment uses `ctfd/ctfd:latest` with `pull_policy: always`. Every Compose
 `up` (including `sh start.sh`) checks the registry and recreates CTFd if its image
 has changed. A failed pull stops startup instead of silently using an old image.
 The latest image was checked locally on 2026-09-17 and contains CTFd 3.8.7.

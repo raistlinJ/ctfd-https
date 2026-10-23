@@ -36,6 +36,24 @@ files are not copied. Select a published branch/tag or another public HTTPS
 repository with `--repo-ref` and `--repo-url`. The selected version must include
 `start.sh`, the Compose file, Nginx configuration, and the complete themes.
 
+To build a different CTFd application inside that HTTPS deployment, pass its
+public Git URL separately:
+
+```sh
+bash scripts/provision/proxmox/install-ctfd.sh \
+  --ssh-public-key /root/ctfd-admin.pub \
+  --source-url 'https://github.com/raistlinJ/CTFd.git#feature/retract-solves'
+```
+
+The source can be a branch, tag, or full commit SHA after `#`. The equivalent
+config setting is `source_url`, and the environment variable is
+`CTFD_SOURCE_URL`. An empty source uses the official latest image. Source mode
+builds the repository's Dockerfile and uses its bundled themes, while retaining
+the HTTPS stack's database and upload directories. Both initial guest startup
+calls receive the source URL. For later manual starts in the guest, pass the same
+`sh start.sh --source-url 'URL#ref'` option again; plain `sh start.sh` selects the
+official image unless `CTFD_SOURCE_URL` is set.
+
 ## Configuration file
 
 Copy [ctfd.conf.example](ctfd.conf.example), set `ssh_public_key` to your public

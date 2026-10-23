@@ -9,6 +9,7 @@ export DEBIAN_FRONTEND=noninteractive
 
 repo_url=$1
 repo_ref=$2
+export CTFD_SOURCE_URL=${3:-}
 # shellcheck disable=SC1091
 . /etc/os-release
 [[ "$ID" == debian && "$VERSION_ID" == 12 ]]

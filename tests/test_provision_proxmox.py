@@ -51,6 +51,29 @@ class ProxmoxInputTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("192.0.2.10/24", result.stdout)
 
+    def test_ctfd_source_url_is_separate_from_deployment_repository(self):
+        source = "https://github.com/raistlinJ/CTFd.git#feature/retract-solves"
+        result = self.run_installer("--source-url", source)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Guest clones https://github.com/raistlinJ/ctfd-https.git (main)", result.stdout)
+        self.assertIn("CTFd builds from " + source, result.stdout)
+        config = self.write_config("source_url=" + source + "\n")
+        result = self.run_installer("--config", config)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("CTFd builds from " + source, result.stdout)
+        other = "https://example.com/CTFd.git#other"
+        result = self.run_installer("--config", config, environment={"CTFD_SOURCE_URL": other})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("CTFd builds from " + other, result.stdout)
+        result = self.run_installer("--config", config, "--source-url", source, environment={"CTFD_SOURCE_URL": other})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("CTFd builds from " + source, result.stdout)
+
+    def test_rejects_invalid_source_url(self):
+        for source in ("file:///tmp/repo", "http://example.com/repo", "https://example.com/has space", "https://example.com/repo\nother"):
+            with self.subTest(source=source):
+                self.assertNotEqual(self.run_installer("--source-url", source).returncode, 0)
+
     def test_rejects_invalid_networks(self):
         for args in (
             ("--ip", "192.0.2.10/24"),

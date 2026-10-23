@@ -15,6 +15,7 @@ DNS=
 SSH_KEY=
 REPO_URL=https://github.com/raistlinJ/ctfd-https.git
 REPO_REF=main
+SOURCE_URL=
 WAIT_MINUTES=30
 NO_WAIT=0
 DRY_RUN=0
@@ -45,6 +46,7 @@ Docker Compose, and start CTFd HTTPS. Run as root on the target Proxmox node.
   --ssh-public-key FILE     Required OpenSSH public key; login user: ctfd
   --repo-url URL            Public HTTPS Git repo (default: this repo's origin)
   --repo-ref REF            Published branch or tag (default: main)
+  --source-url URL          Build CTFd from HTTPS Git URL, optionally with #ref
   --wait-minutes N          Bootstrap timeout (default: 30)
   --no-wait                 Return after starting the VM
   --dry-run                 Validate inputs and print the plan; no host changes
@@ -67,7 +69,7 @@ trim_config_value() {
 apply_setting() {
     local key="$1" value="$2" origin="$3" target
     case "$key" in
-        vmid|name|storage|snippet_storage|bridge|cores|ip|gateway|dns|repo_url|repo_ref|wait_minutes|no_wait|dry_run)
+        vmid|name|storage|snippet_storage|bridge|cores|ip|gateway|dns|repo_url|repo_ref|source_url|wait_minutes|no_wait|dry_run)
             target=$(printf '%s' "$key" | tr '[:lower:]' '[:upper:]') ;;
         ssh_public_key) target=SSH_KEY ;;
         *) die "$origin: unknown config key: $key" ;;
@@ -130,7 +132,7 @@ find_config() {
 
 find_config "$@"
 [[ -z "$CONFIG_FILE" ]] || load_config
-for key in vmid name storage snippet_storage bridge cores ip gateway dns ssh_public_key repo_url repo_ref wait_minutes no_wait dry_run; do
+for key in vmid name storage snippet_storage bridge cores ip gateway dns ssh_public_key repo_url repo_ref source_url wait_minutes no_wait dry_run; do
     environment_name="CTFD_$(printf '%s' "$key" | tr '[:lower:]' '[:upper:]')"
     if declare -p "$environment_name" >/dev/null 2>&1; then
         apply_setting "$key" "${!environment_name}" "$environment_name"
@@ -160,6 +162,7 @@ while (($#)); do
         --ssh-public-key) SSH_KEY=$2 ;;
         --repo-url) REPO_URL=$2 ;;
         --repo-ref) REPO_REF=$2 ;;
+        --source-url) SOURCE_URL=$2 ;;
         --wait-minutes) WAIT_MINUTES=$2 ;;
         *) die "unknown option: $1" ;;
     esac
@@ -187,6 +190,9 @@ if not keys or any(not line.startswith(("ssh-", "ecdsa-", "sk-")) for line in ke
 PY
 [[ "$REPO_URL" == https://* && "$REPO_URL" != *[$'\r\n\t ']* ]] || die 'repo-url must be a public HTTPS URL'
 [[ -n "$REPO_REF" && "$REPO_REF" != -* && "$REPO_REF" != *[$'\r\n']* ]] || die 'invalid repository ref'
+if [[ -n "$SOURCE_URL" ]]; then
+    [[ "$SOURCE_URL" == https://?* && "$SOURCE_URL" != *[[:space:]]* ]] || die 'source-url must be a public HTTPS Git URL without whitespace'
+fi
 python3 - "$IP" "$GATEWAY" "$DNS" <<'PY'
 import ipaddress
 import sys
@@ -212,6 +218,7 @@ PY
 printf 'VM %s (%s): Debian 12 minimal, %s cores, 4096 MiB RAM, 40 GiB disk\n' "$VMID" "$NAME" "$CORES"
 printf 'Storage: %s; snippets: %s; bridge: %s; IPv4: %s\n' "$STORAGE" "$SNIPPET_STORAGE" "$BRIDGE" "$IP"
 printf 'Guest clones %s (%s) into /opt/ctfd-https; SSH user: ctfd\n' "$REPO_URL" "$REPO_REF"
+[[ -z "$SOURCE_URL" ]] || printf 'CTFd builds from %s using bundled themes\n' "$SOURCE_URL"
 if ((DRY_RUN)); then
     echo 'Dry run: no downloads or Proxmox commands performed. Host availability checks run during installation.'
     exit 0
@@ -271,11 +278,11 @@ if [[ ! -f "$IMAGE" ]] || [[ $(sha512sum "$IMAGE" | awk '{print $1}') != "$expec
 fi
 
 # JSON is valid YAML; serialization keeps key comments, URLs and refs as data.
-python3 - "$NAME" "$SSH_KEY" "$SCRIPT_DIR/bootstrap-guest.sh" "$REPO_URL" "$REPO_REF" > "$WORK_DIR/user.yaml" <<'PY'
+python3 - "$NAME" "$SSH_KEY" "$SCRIPT_DIR/bootstrap-guest.sh" "$REPO_URL" "$REPO_REF" "$SOURCE_URL" > "$WORK_DIR/user.yaml" <<'PY'
 import json
 from pathlib import Path
 import sys
-name, keyfile, bootstrap, url, ref = sys.argv[1:]
+name, keyfile, bootstrap, url, ref, source_url = sys.argv[1:]
 keys = [line.strip() for line in Path(keyfile).read_text().splitlines() if line.strip() and not line.startswith("#")]
 if not keys or any(not line.startswith(("ssh-", "ecdsa-", "sk-")) for line in keys):
     sys.exit("Expected an OpenSSH public key file (not a private key)")
@@ -290,7 +297,7 @@ config = {
     "resize_rootfs": True,
     "write_files": [{"path": "/usr/local/sbin/bootstrap-ctfd", "permissions": "0700",
                      "owner": "root:root", "content": Path(bootstrap).read_text()}],
-    "runcmd": [["/usr/local/sbin/bootstrap-ctfd", url, ref]],
+    "runcmd": [["/usr/local/sbin/bootstrap-ctfd", url, ref, source_url]],
 }
 print("#cloud-config")
 print(json.dumps(config, indent=2))
