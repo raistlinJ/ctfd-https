@@ -7,22 +7,26 @@ cd "$ctfd_project_dir"
 
 usage() {
     cat <<'EOF'
-Usage: sh start.sh [--source-url URL] [compose-up arguments...]
+Usage: sh start.sh [--init] [--source-url URL] [compose-up arguments...]
 
-Start CTFd HTTPS with the official latest image, or build CTFd from a public
-HTTPS Git URL. Append #branch, #tag, or #full-commit-sha to select a version.
-CTFD_SOURCE_URL supplies the same option through the environment.
+Start CTFd HTTPS using .env and docker-compose-https.yml.
+The default source is the raistlinJ/CTFd feature/retract-solves branch.
+Edit .env to configure the source, ports, images, workers, and database.
+--source-url or CTFD_SOURCE_URL saves a source selection into .env for later starts.
+--init creates missing configuration/signing-key files without starting containers.
 
 Example:
   sh start.sh --source-url 'https://github.com/raistlinJ/CTFd.git#feature/retract-solves'
 
-Source mode requires Docker Compose 2.24.4+ and uses the source's bundled themes.
+The selected source's bundled themes are used. Only Docker Compose v2 is required.
 EOF
 }
 
 ctfd_source_url=${CTFD_SOURCE_URL:-}
+ctfd_init_only=0
 while [ "$#" -gt 0 ]; do
     case "$1" in
+        --init) ctfd_init_only=1; shift ;;
         --source-url)
             if [ "$#" -lt 2 ] || [ -z "$2" ]; then
                 echo "--source-url requires an HTTPS Git URL." >&2
@@ -52,6 +56,23 @@ if [ -n "$ctfd_source_url" ]; then
 fi
 
 umask 077
+if [ ! -e .env ]; then
+    (set -C; cat .env.example > .env)
+    echo "Created .env from .env.example. Edit it to configure this deployment."
+fi
+
+if [ -n "$ctfd_source_url" ]; then
+    # Quote literal dotenv data; never execute .env as a shell script.
+    ctfd_source_quoted=$(printf '%s' "$ctfd_source_url" | sed 's/\\/\\\\/g; s/'"'"'/\\'"'"'/g')
+    ctfd_config_tmp=$(mktemp .env.XXXXXX)
+    trap 'rm -f -- "$ctfd_config_tmp"' 0
+    awk '!/^[[:space:]]*(export[[:space:]]+)?CTFD_SOURCE_URL[[:space:]]*=/' .env > "$ctfd_config_tmp"
+    printf "\nCTFD_SOURCE_URL='%s'\n" "$ctfd_source_quoted" >> "$ctfd_config_tmp"
+    mv -- "$ctfd_config_tmp" .env
+    export CTFD_SOURCE_URL="$ctfd_source_url"
+    echo "Saved CTFd source selection in .env."
+fi
+
 mkdir -p secrets
 if [ ! -e secrets/.env ]; then
     ctfd_key=$(openssl rand -hex 32)
@@ -66,11 +87,7 @@ if ! grep -Eq '^SECRET_KEY=.+$' secrets/.env; then
     exit 1
 fi
 
-if [ -n "$ctfd_source_url" ]; then
-    export CTFD_SOURCE_URL="$ctfd_source_url"
-    printf 'Building and starting CTFd from %s\n' "$ctfd_source_url"
-    exec docker compose -f docker-compose-https.yml -f docker-compose-source.yml up -d --build "$@"
-fi
+if [ "$ctfd_init_only" -eq 1 ]; then exit 0; fi
 
-echo "Starting Compose; CTFd's pull_policy checks the latest image in the registry."
-exec docker compose -f docker-compose-https.yml up -d "$@"
+echo "Building and starting CTFd using .env and docker-compose-https.yml."
+exec docker compose --env-file .env -f docker-compose-https.yml up -d --build "$@"

@@ -28,15 +28,15 @@ services:
   # -------------------------------------------------
   nginx:
     # Pin a patched stable release; CVE-2026-42533 is fixed in 1.30.4+.
-    image: nginx:1.30.5
+    image: ${NGINX_IMAGE:-nginx:1.30.5}
     container_name: ctfd-nginx
     restart: unless-stopped
     depends_on:
       - cert-init
       - ctfd
     ports:
-      - "80:80"
-      - "443:443"
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
@@ -48,27 +48,33 @@ services:
   # CTFd Application with wait-for-DB
   # -------------------------------------------------
   ctfd:
-    # Check the registry on each Compose start, even if latest is cached locally.
-    image: ctfd/ctfd:latest
-    pull_policy: always
+    image: ${CTFD_IMAGE:-ctfd-https-source:local}
+    pull_policy: build
+    build:
+      context: ${CTFD_SOURCE_URL:-https://github.com/raistlinJ/CTFd.git#feature/retract-solves}
     container_name: ctfd
     restart: unless-stopped
     depends_on:
-      - db
-      - cache
+      db:
+        condition: service_started
+      cache:
+        condition: service_started
+      source-permissions:
+        condition: service_completed_successfully
     # Created on the host by start.sh before Compose reads this file.
     env_file:
       - ./secrets/.env
     environment:
-      DATABASE_URL: mysql+pymysql://ctfd:ctfd@db/ctfd
+      DATABASE_URL: ${CTFD_DATABASE_URL:-mysql+pymysql://ctfd:ctfd@db/ctfd}
       REDIS_URL: redis://cache:6379
-      WORKERS: 4
+      WORKERS: ${CTFD_WORKERS:-4}
       REVERSE_PROXY: "true"
+      UPLOAD_FOLDER: /var/uploads
+      LOG_FOLDER: /var/log/ctfd
     volumes:
       - ./ctfd/logs:/var/log/ctfd
       - ./ctfd/uploads:/var/uploads
-      # Mount the entire themes directory. This must include 'admin' and 'core' built-in themes!
-      - ./ctfd/themes:/opt/CTFd/CTFd/themes
+      # Use the selected source's bundled themes and compiled frontend.
     expose:
       - "8000"
     networks:
@@ -78,14 +84,14 @@ services:
   # MariaDB
   # -------------------------------------------------
   db:
-    image: mariadb:10.11
+    image: ${MARIADB_IMAGE:-mariadb:10.11}
     container_name: ctfd-db
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: ctfd
-      MYSQL_USER: ctfd
-      MYSQL_PASSWORD: ctfd
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-ctfd}
+      MYSQL_USER: ${MYSQL_USER:-ctfd}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-ctfd}
       MYSQL_WAIT_TIMEOUT: 28800
       MYSQL_MAX_ALLOWED_PACKET: 64M
     volumes:
@@ -97,11 +103,22 @@ services:
   # Redis
   # -------------------------------------------------
   cache:
-    image: redis:7-alpine
+    image: ${REDIS_IMAGE:-redis:7-alpine}
     container_name: ctfd-redis
     restart: unless-stopped
     networks:
       - ctfd-net
+
+  # The CTFd source image runs as UID 1001. This helper needs no network.
+  source-permissions:
+    image: alpine:3.20
+    user: "0:0"
+    restart: "no"
+    volumes:
+      - ./ctfd/logs:/var/log/ctfd
+      - ./ctfd/uploads:/var/uploads
+    entrypoint: ["chown", "-R", "1001:1001", "/var/log/ctfd", "/var/uploads"]
+    network_mode: "none"
 
 networks:
   ctfd-net:

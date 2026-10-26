@@ -3,3 +3,6 @@
 /*.zip.log
 __pycache__/
 /secrets/
+/.env
+/.env.*
+!/.env.example

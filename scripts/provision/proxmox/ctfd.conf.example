@@ -28,9 +28,8 @@ repo_url=https://github.com/raistlinJ/ctfd-https.git
 repo_ref=main
 
 # Optional CTFd application source (separate from the HTTPS deployment repo).
-# Leave empty for the official latest image. Append #branch, #tag, or #full-SHA.
-# source_url=https://github.com/raistlinJ/CTFd.git#feature/retract-solves
-source_url=
+# Append #branch, #tag, or #full-SHA. Saved into the guest's deployment .env.
+source_url=https://github.com/raistlinJ/CTFd.git#feature/retract-solves
 
 # Boolean values: true/false, yes/no, on/off, or 1/0 (case-insensitive)
 wait_minutes=30

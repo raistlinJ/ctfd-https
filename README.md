@@ -20,69 +20,80 @@ then command-line flags.
 
 ## Starting the HTTPS deployment
 
-With Docker Compose and OpenSSL installed, run:
+This deployment uses one Compose file, `docker-compose-https.yml`, and a root
+`.env` for configuration. The default application is your custom fork:
 
-```sh
-sh start.sh
+```dotenv
+COMPOSE_FILE=docker-compose-https.yml
+CTFD_SOURCE_URL='https://github.com/raistlinJ/CTFd.git#feature/retract-solves'
 ```
 
-This creates `secrets/.env` with a random CTFd `SECRET_KEY` before starting
-Compose. Subsequent starts reuse the existing key. Keep this file with your
-deployment; it is excluded from Git. Extra arguments are passed to `compose up`,
-for example `sh start.sh --build`.
-
-Compose reads `env_file` before starting any containers, so a Compose init
-service cannot create a required env file on the first run. The key is supplied
-only through `env_file`: an explicit `environment.SECRET_KEY` would override it.
-
-### Starting a CTFd fork by URL
-
-To run the version with **Retract solve** for users and teams:
+With Docker Compose v2 and OpenSSL installed, initialize the configuration:
 
 ```sh
-sh start.sh --source-url 'https://github.com/raistlinJ/CTFd.git#feature/retract-solves'
+sh start.sh --init
 ```
 
-This builds the selected Git repository's Dockerfile and starts it in the same
-HTTPS stack. Append `#branch`, `#tag`, or a full 40-character commit hash to select
-a version. For this exact tested revision, use
-`https://github.com/raistlinJ/CTFd.git#1c19ae182ebe2648f57a0c072937db1bd1b4594a`.
-The URL can also be supplied through `CTFD_SOURCE_URL`. Put `--source-url` before
-any Compose arguments, for example `--source-url 'URL#ref' --force-recreate ctfd`.
+This creates `.env` from [`.env.example`](.env.example) and creates
+`secrets/.env` with a random CTFd signing key if absent. Existing configuration
+and signing keys are preserved. Both local files are gitignored. Edit `.env`
+to change the source repository/revision, image tags, HTTP/HTTPS ports, workers,
+and database connection settings. Keep the existing database credentials when
+updating an initialized deployment; changing `.env` alone does not change the
+accounts stored in MariaDB. For a new database, keep `MYSQL_*` and
+`CTFD_DATABASE_URL` consistent, URL-encoding credentials in the URL.
 
-Source mode uses `docker-compose-source.yml`, builds on every invocation, and
-uses the selected source's bundled themes and compiled frontend. It keeps the
-existing database, uploads, logs, certificates, and secret key. The host's
-`ctfd/themes` directory is left in place but is not mounted in this mode, so it
-cannot hide the fork's new UI. Docker Compose **2.24.4 or newer** is required.
-The initial build can take several minutes.
-
-Supply the URL again on each manual start (or set `CTFD_SOURCE_URL` in your
-shell). Automatic container restarts keep the selected image. To switch back
-to the official image, unset `CTFD_SOURCE_URL` and run `sh start.sh`.
-
-The Proxmox installer accepts the same `--source-url` option, or `source_url` in
-its config file. This selects the CTFd application; `--repo-url` and `--repo-ref`
-continue to select the separate HTTPS deployment repository.
-
-Without a source URL, the deployment uses `ctfd/ctfd:latest` with `pull_policy: always`. Every Compose
-`up` (including `sh start.sh`) checks the registry and recreates CTFd if its image
-has changed. A failed pull stops startup instead of silently using an old image.
-The latest image was checked locally on 2026-09-17 and contains CTFd 3.8.7.
-After copying the updated Compose file to an existing server, force an upgrade
-of the app and verify the version actually running:
+Then start the stack:
 
 ```sh
-docker compose -f docker-compose-https.yml up -d --no-deps --pull always --force-recreate ctfd
-docker compose -f docker-compose-https.yml exec ctfd python -c 'from CTFd import __version__; print(__version__)'
+sudo sh start.sh
 ```
 
-Confirm that the last command prints `3.8.7` (or a newer release), then retry the Web UI import.
-An older image (including a locally cached `latest` tag) may reject these ZIPs
-with “The target migration in this backup is not available in this version of
-CTFd.” Restarting an existing container alone does not upgrade its image.
-The saved import error can remain visible after an upgrade until another import
-is attempted; use the running version to verify that the upgrade took effect.
+Or use Compose directly from this directory; `.env` selects the single file:
+
+```sh
+sudo docker compose config --quiet
+sudo docker compose up -d --build
+```
+
+The launcher also accepts Compose `up` arguments, such as
+`sudo sh start.sh --force-recreate ctfd`. It builds the selected Git source and
+uses its bundled themes and compiled frontend. The existing `db`, `ctfd/uploads`,
+`ctfd/logs`, `certs`, and signing-key paths are retained. The host `ctfd/themes`
+directory is no longer mounted over the source image. The permissions helper
+runs without networking. The initial build can take several minutes.
+
+### Changing the CTFd source
+
+Edit `CTFD_SOURCE_URL` in `.env` and rebuild. Append `#branch`, `#tag`, or a full
+commit SHA. The configurable solve-retraction revision is
+`126448dceafc866a540a1dc1a44d45ee66811e5e`. To build stock CTFd, set the source to
+`https://github.com/CTFd/CTFd.git#3.8.9` instead.
+
+For compatibility, a source can also be selected with:
+
+```sh
+sudo sh start.sh --source-url 'https://github.com/raistlinJ/CTFd.git#feature/retract-solves'
+```
+
+The launcher saves this selection in `.env`, so subsequent starts use the same
+source without repeating the option. An explicit option overrides a supplied
+`CTFD_SOURCE_URL` environment variable. `.env` is read as configuration data,
+never executed as a shell script. Verify the running application after startup:
+
+```sh
+sudo docker compose exec ctfd python -c 'from CTFd import __version__; print(__version__)'
+```
+
+Both the fork and stock CTFd can report the same release version. The selected
+Git revision in `.env` identifies the custom build. Enable **Users Can Clear
+Submissions** in **Config → Challenges**, or refresh DeployForge's CTFd Manager
+and use its switch.
+
+The Proxmox installer accepts the same `--source-url` option or `source_url`
+config key and saves it in the guest's `.env`. `--repo-url` and `--repo-ref`
+select the separate HTTPS deployment repository. There is no source overlay to
+combine with the base file.
 
 ## Updating the HTTPS proxy
 

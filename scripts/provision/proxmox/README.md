@@ -46,13 +46,13 @@ bash scripts/provision/proxmox/install-ctfd.sh \
 ```
 
 The source can be a branch, tag, or full commit SHA after `#`. The equivalent
-config setting is `source_url`, and the environment variable is
-`CTFD_SOURCE_URL`. An empty source uses the official latest image. Source mode
-builds the repository's Dockerfile and uses its bundled themes, while retaining
-the HTTPS stack's database and upload directories. Both initial guest startup
-calls receive the source URL. For later manual starts in the guest, pass the same
-`sh start.sh --source-url 'URL#ref'` option again; plain `sh start.sh` selects the
-official image unless `CTFD_SOURCE_URL` is set.
+installer config setting is `source_url`, and the environment variable is
+`CTFD_SOURCE_URL`. The default is the custom fork's `feature/retract-solves`
+branch. The launcher saves the selection into `/opt/ctfd-https/.env`; later
+manual starts use `sudo sh start.sh` or `sudo docker compose up -d --build`
+without repeating the URL. Edit the guest's `.env` to change the source, ports,
+image tags, workers, or database connection settings. One Compose file contains
+the entire stack, and the source's bundled themes are used.
 
 ## Configuration file
 
@@ -130,7 +130,7 @@ sudo docker compose -f docker-compose-https.yml ps
 sudo sh start.sh
 ```
 
-`start.sh` keeps the existing secret key and checks for the latest CTFd image.
+`start.sh` keeps the existing secret key and builds the configured CTFd source.
 Container restart policies bring the services back after a reboot. Back up
 the deployment's `secrets`, `db`, `ctfd/uploads`, and `certs` along with any
 custom themes. The provisioner uses the repository's existing Compose settings,
