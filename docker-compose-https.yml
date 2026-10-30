@@ -87,6 +87,10 @@ services:
     image: ${MARIADB_IMAGE:-mariadb:10.11}
     container_name: ctfd-db
     restart: unless-stopped
+    # Work around docker-default denying UNIX socket creation on this host.
+    # Remove after the host's Docker/AppArmor compatibility issue is fixed.
+    security_opt:
+      - apparmor=unconfined
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-ctfd}
