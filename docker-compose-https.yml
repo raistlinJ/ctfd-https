@@ -31,6 +31,10 @@ services:
     image: ${NGINX_IMAGE:-nginx:1.30.5}
     container_name: ctfd-nginx
     restart: unless-stopped
+    # Work around docker-default denying UNIX socket creation on this host.
+    # Remove after the host's Docker/AppArmor compatibility issue is fixed.
+    security_opt:
+      - apparmor=unconfined
     depends_on:
       - cert-init
       - ctfd
