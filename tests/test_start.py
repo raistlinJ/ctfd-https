@@ -124,13 +124,23 @@ class StartTests(unittest.TestCase):
     def test_one_compose_file_defaults_to_fork_and_preserves_persistent_paths(self):
         self.assertEqual(self.start('--init').returncode, 0)
         config = self.compose_config()
-        self.assertEqual(set(config['services']), {'ctfd', 'nginx', 'db', 'cache', 'cert-init', 'source-permissions'})
+        self.assertEqual(set(config['services']), {'ctfd', 'nginx', 'db', 'cache', 'cert-init', 'source-permissions', 'source-assets'})
         app = config['services']['ctfd']
         self.assertEqual(app['build']['context'], SOURCE)
         self.assertEqual(app['pull_policy'], 'build')
         self.assertEqual(app['image'], 'ctfd-https-source:local')
         mounts = {mount['target']: mount['source'] for mount in app['volumes']}
-        self.assertEqual(mounts, {'/var/log/ctfd': str(self.root / 'ctfd/logs'), '/var/uploads': str(self.root / 'ctfd/uploads')})
+        self.assertEqual(mounts, {'/var/log/ctfd': str(self.root / 'ctfd/logs'), '/var/uploads': str(self.root / 'ctfd/uploads'),
+                                  '/opt/CTFd/CTFd/themes': str(self.root / 'themes'),
+                                  '/opt/CTFd/CTFd/plugins': str(self.root / 'plugins')})
+        for mount in app['volumes']:
+            if mount['target'].startswith('/opt/CTFd/'):
+                self.assertTrue(mount['read_only'])
+        self.assertEqual(app['depends_on']['source-assets']['condition'], 'service_completed_successfully')
+        assets = config['services']['source-assets']
+        self.assertEqual(assets['image'], app['image'])
+        self.assertEqual(assets['build'], app['build'])
+        self.assertEqual(assets['network_mode'], 'none')
         self.assertEqual(config['services']['db']['volumes'][0]['source'], str(self.root / 'db'))
         proxy_mounts = {item['target']: item['source'] for item in config['services']['nginx']['volumes']}
         self.assertEqual(proxy_mounts['/etc/nginx/certs'], str(self.root / 'certs'))

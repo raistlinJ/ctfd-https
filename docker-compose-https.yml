@@ -1,3 +1,9 @@
+x-ctfd-image: &ctfd-image
+  image: ${CTFD_IMAGE:-ctfd-https-source:local}
+  pull_policy: build
+  build:
+    context: ${CTFD_SOURCE_URL:-https://github.com/raistlinJ/CTFd.git#feature/retract-solves}
+
 services:
   # -------------------------------------------------
   # Generate self-signed TLS certs (one-time)
@@ -52,10 +58,7 @@ services:
   # CTFd Application with wait-for-DB
   # -------------------------------------------------
   ctfd:
-    image: ${CTFD_IMAGE:-ctfd-https-source:local}
-    pull_policy: build
-    build:
-      context: ${CTFD_SOURCE_URL:-https://github.com/raistlinJ/CTFd.git#feature/retract-solves}
+    <<: *ctfd-image
     container_name: ctfd
     restart: unless-stopped
     depends_on:
@@ -64,6 +67,8 @@ services:
       cache:
         condition: service_started
       source-permissions:
+        condition: service_completed_successfully
+      source-assets:
         condition: service_completed_successfully
     # Created on the host by start.sh before Compose reads this file.
     env_file:
@@ -78,7 +83,9 @@ services:
     volumes:
       - ./ctfd/logs:/var/log/ctfd
       - ./ctfd/uploads:/var/uploads
-      # Use the selected source's bundled themes and compiled frontend.
+      # Initialized from the selected image before the app starts.
+      - ./themes:/opt/CTFd/CTFd/themes:ro
+      - ./plugins:/opt/CTFd/CTFd/plugins:ro
     expose:
       - "8000"
     networks:
@@ -126,6 +133,19 @@ services:
       - ./ctfd/logs:/var/log/ctfd
       - ./ctfd/uploads:/var/uploads
     entrypoint: ["chown", "-R", "1001:1001", "/var/log/ctfd", "/var/uploads"]
+    network_mode: "none"
+
+  # Seed missing built-in assets before bind mounts hide the image's copies.
+  # Custom themes/plugins and existing local edits are preserved.
+  source-assets:
+    <<: *ctfd-image
+    user: "0:0"
+    restart: "no"
+    volumes:
+      - ./themes:/host/themes
+      - ./plugins:/host/plugins
+      - ./scripts/seed_assets.py:/seed_assets.py:ro
+    entrypoint: ["python", "/seed_assets.py"]
     network_mode: "none"
 
 networks:

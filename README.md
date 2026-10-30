@@ -59,9 +59,48 @@ sudo docker compose up -d --build
 The launcher also accepts Compose `up` arguments, such as
 `sudo sh start.sh --force-recreate ctfd`. It builds the selected Git source and
 uses its bundled themes and compiled frontend. The existing `db`, `ctfd/uploads`,
-`ctfd/logs`, `certs`, and signing-key paths are retained. The host `ctfd/themes`
-directory is no longer mounted over the source image. The permissions helper
-runs without networking. The initial build can take several minutes.
+`ctfd/logs`, `certs`, and signing-key paths are retained. Local `themes/` and
+`plugins/` directories are mounted into the application. A startup helper seeds
+missing bundled files from the selected image before CTFd starts; existing
+local files are preserved. Both startup helpers run without networking. The
+initial build can take several minutes.
+
+### Local themes and plugins
+
+The application mounts these directories from the root of this repository:
+
+```text
+themes/  → /opt/CTFd/CTFd/themes/
+plugins/ → /opt/CTFd/CTFd/plugins/
+```
+
+Run `sh start.sh` after updating this repository. The `source-assets` service
+creates and populates both directories using the same image as CTFd, including
+the built-in core/admin themes, compiled frontend and plugin package files.
+The app waits for this step to succeed. The app sees read-only mounts; edit
+files on the host. The older `ctfd/themes/` directory is not mounted.
+
+For Operation Evergreen, copy from the previously extracted remote package
+after the first start:
+
+```sh
+cp -a evergreen-remote/CTFd/themes/evergreen themes/
+cp -a evergreen-remote/CTFd/plugins/evergreen plugins/
+docker compose restart ctfd
+docker compose exec -T ctfd python < evergreen-remote/activate.py
+docker compose restart ctfd
+```
+
+Keep the two `evergreen` folders directly inside `themes/` and `plugins/`.
+Then hard-refresh the browser. No database re-import is required.
+
+The directories are gitignored and persist across container recreation. Back
+them up separately from CTFd event exports, which omit installed theme/plugin
+code. Restart CTFd after plugin or template changes; refresh the browser for
+CSS/image changes. Initialization adds missing files and never overwrites
+existing files. When changing the CTFd source/release, refresh its built-in
+theme/plugin files from that image after backing up any local edits, so the
+mounted code stays compatible with the new source. Custom folders can be kept.
 
 ### Changing the CTFd source
 

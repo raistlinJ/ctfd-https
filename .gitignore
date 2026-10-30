@@ -6,3 +6,6 @@ __pycache__/
 /.env
 /.env.*
 !/.env.example
+# Populated from the selected image; can also contain private custom plugins.
+/themes/
+/plugins/

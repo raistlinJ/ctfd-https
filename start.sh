@@ -18,7 +18,8 @@ Edit .env to configure the source, ports, images, workers, and database.
 Example:
   sh start.sh --source-url 'https://github.com/raistlinJ/CTFd.git#feature/retract-solves'
 
-The selected source's bundled themes are used. Only Docker Compose v2 is required.
+Local themes/ and plugins/ are mounted into CTFd. Missing bundled files are seeded
+from the selected source image before startup. Only Docker Compose v2 is required.
 EOF
 }
 
